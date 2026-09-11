@@ -1,5 +1,8 @@
 import pg from "pg";
+import nextEnv from "@next/env";
 
+const { loadEnvConfig } = nextEnv;
+loadEnvConfig(process.cwd());
 const connectionString = process.env.DATABASE_URL || "postgresql://researchos:researchos_local_only@localhost:5433/researchos_test";
 const pool = new pg.Pool({ connectionString });
 const result = await pool.query("SELECT to_regclass('public.research_sessions') AS table_name");
