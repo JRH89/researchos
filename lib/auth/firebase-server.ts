@@ -24,7 +24,10 @@ export async function authenticate(request: Request): Promise<{ user: Authentica
   try {
     const decoded = await (await adminAuth()).verifyIdToken(token, true);
     return { user: { uid: decoded.uid, email: decoded.email, name: decoded.name } };
-  } catch {
-    return { response: NextResponse.json({ error: "Your sign-in session is invalid or expired." }, { status: 401 }) };
+  } catch (cause) {
+    const firebaseError = cause as { code?: string; message?: string };
+    console.error("ResearchOS Firebase token verification failed", { code: firebaseError.code, message: firebaseError.message });
+    const detail = firebaseError.code ? `Firebase verification failed (${firebaseError.code}). ${firebaseError.message || "Refresh your sign-in and try again."}` : "Your sign-in session is invalid or expired.";
+    return { response: NextResponse.json({ error: "Your sign-in session is invalid or expired.", detail }, { status: 401 }) };
   }
 }

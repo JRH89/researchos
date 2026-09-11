@@ -62,18 +62,20 @@ export function ResearchWorkbench() {
   }, [liveTrace.length]);
   useEffect(() => {
     if (!firebaseConfigured) { setAuthError("Firebase is not configured for this deployment."); return; }
-    return onIdTokenChanged(firebaseAuth(), async (nextUser) => { setUser(nextUser); setIdToken(nextUser ? await nextUser.getIdToken() : null); });
+    return onIdTokenChanged(firebaseAuth(), async (nextUser) => { setUser(nextUser); setIdToken(nextUser ? await nextUser.getIdToken(true) : null); });
   }, []);
   useEffect(() => { if (!idToken) { setWorkspaces([]); return; } void authFetch("/api/workspaces").then((response) => response.ok ? response.json() : []).then(setWorkspaces).catch(() => setWorkspaces([])); }, [idToken]);
   useEffect(() => { if (!idToken) { setWritingProfiles([]); return; } void authFetch("/api/writing-profiles").then((response) => response.ok ? response.json() : []).then(setWritingProfiles).catch(() => setWritingProfiles([])); }, [idToken]);
   useEffect(() => { if (!idToken || !workspaceId) { setWorkspaceRuns([]); setSelectedPaperRunIds([]); return; } void authFetch(`/api/workspaces/${workspaceId}/sessions`).then((response) => response.ok ? response.json() : []).then((runs: WorkspaceRun[]) => { setWorkspaceRuns(runs); setSelectedPaperRunIds((current) => current.length ? current.filter((id) => runs.some((run) => run.id === id)) : runs.map((run) => run.id)); }).catch(() => setWorkspaceRuns([])); }, [idToken, workspaceId, session?.id]);
-  async function authenticatedHeaders() {
+  async function authenticatedHeaders(forceRefresh = false) {
     const currentUser = firebaseConfigured ? firebaseAuth().currentUser : null;
-    const token = currentUser ? await currentUser.getIdToken() : idToken;
+    const token = currentUser ? await currentUser.getIdToken(forceRefresh) : idToken;
     return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   }
   async function authFetch(path: string, init: RequestInit = {}) {
-    return fetch(api(path), { ...init, headers: { ...(await authenticatedHeaders()), ...init.headers } });
+    const request = async (forceRefresh = false) => fetch(api(path), { ...init, headers: { ...(await authenticatedHeaders(forceRefresh)), ...init.headers } });
+    const response = await request();
+    return response.status === 401 && firebaseAuth().currentUser ? request(true) : response;
   }
   async function withAuth(action: () => Promise<void>) { setAuthError(null); setAuthLoading(true); try { await action(); } catch (cause) { setAuthError(cause instanceof Error ? cause.message : "Sign-in failed."); } finally { setAuthLoading(false); } }
   async function signInGoogle() { await withAuth(() => signInWithPopup(firebaseAuth(), new GoogleAuthProvider()).then(() => undefined)); }
@@ -107,7 +109,7 @@ export function ResearchWorkbench() {
   async function createNewWorkspace() {
     const name = window.prompt("Workspace name"); if (!name?.trim()) return;
     const response = await authFetch("/api/workspaces", { method: "POST", body: JSON.stringify({ name }) });
-    if (!response.ok) { setError("Could not create the workspace."); return; }
+    if (!response.ok) { const body = await response.json().catch(() => null) as { error?: string; detail?: string } | null; setError(body?.detail || body?.error || "Could not create the workspace."); return; }
     const workspace: Workspace = await response.json(); setWorkspaces((current) => [workspace, ...current]); setWorkspaceId(workspace.id);
   }
   async function draftPaper() {
