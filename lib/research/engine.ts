@@ -20,11 +20,14 @@ export async function runResearch(question = DEFAULT_QUESTION, options: Research
   add("plan", `Created ${objectives.length} research objectives.`, "complete", objectives.join(" · "));
   const tools = await discoverTools();
   add("plan", `Dynamically discovered ${tools.length} MCP tools across ${new Set(tools.map((tool) => tool.server)).size} server(s).`);
+  const researchTools = tools.filter((tool) => tool.server !== "local-research-corpus");
+  const eligibleTools = researchTools.length ? researchTools : tools;
+  if (researchTools.length) add("plan", "Using live research MCP tools; local test corpus held in reserve.");
   const evidence: Evidence[] = [];
   let calls = 0; let iterations = 1; let spent = 0;
   const usedTools = new Set<string>();
   while (calls < MAX_TOOL_CALLS && iterations < MAX_ITERATIONS) {
-    const selection = await chooseTool(question, tools.filter((tool) => !usedTools.has(`${tool.server}:${tool.name}`)));
+    const selection = await chooseTool(question, eligibleTools.filter((tool) => !usedTools.has(`${tool.server}:${tool.name}`)));
     if (!selection) break;
     const { tool } = selection;
     if (calls >= MAX_TOOL_CALLS || iterations >= MAX_ITERATIONS) break;
