@@ -140,11 +140,42 @@ html { scroll-behavior: smooth; }
 .shell .paper-preview { margin: 32px auto 0; }
 .paper-preview > div:first-child { display: grid; justify-items: center; text-align: center; }
 .paper-preview .paper-downloads { display: flex; justify-content: center; }
+.billing-overlay { align-items: flex-start; overflow-y: auto; padding: 34px 20px; }
+.billing-panel { position: relative; width: min(1040px, 100%); margin: auto; padding: 34px; border: 1px solid #d7e0e4; border-radius: 8px; background: #f9fbfc; box-shadow: 0 28px 80px rgb(35 49 59 / .24); }
+.billing-heading { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; padding: 0 0 27px; border-bottom: 1px solid #dbe4e8; }
+.billing-heading h2 { margin: 0; color: #1d303c; font-size: clamp(28px, 4vw, 40px); line-height: 1; letter-spacing: -.045em; }
+.billing-heading p:not(.eyebrow) { max-width: 530px; margin: 12px 0 0; color: #64737c; font-size: 14px; line-height: 1.55; }
+.credit-balance { min-width: 190px; display: grid; gap: 5px; padding: 16px; border: 1px solid #cddce2; background: #edf4f6; color: #42535d; }
+.credit-balance span,.credit-balance small { font: 600 10px 'IBM Plex Mono', monospace; letter-spacing: .06em; text-transform: uppercase; }
+.credit-balance strong { color: #263a45; font: 700 34px/1 Inter, Arial, sans-serif; }
+.credit-balance small { color: #6a7e88; text-transform: none; letter-spacing: 0; }
+.billing-section { padding-top: 28px; }
+.billing-section-title { display: flex; justify-content: space-between; gap: 20px; align-items: center; margin-bottom: 15px; }
+.billing-section-title h3 { margin: 0; color: #263a45; font-size: 19px; letter-spacing: -.03em; }
+.billing-section-title > span { color: #70808a; font: 500 11px 'IBM Plex Mono', monospace; }
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.price-card { display: grid; gap: 9px; min-height: 218px; padding: 18px; border: 1px solid #d6e0e5; background: #fff; }
+.price-card > p { margin: 0; color: #4f6975; font: 700 11px 'IBM Plex Mono', monospace; letter-spacing: .06em; text-transform: uppercase; }
+.price-card > strong { color: #20343f; font: 700 30px/1 Inter, Arial, sans-serif; letter-spacing: -.05em; }
+.price-card > strong small { color: #61747f; font: 600 12px Inter, Arial, sans-serif; letter-spacing: 0; }
+.price-card > span { color: #263a45; font: 600 13px Inter, Arial, sans-serif; }
+.price-card > small { min-height: 30px; color: #71818a; font: 400 12px/1.45 Inter, Arial, sans-serif; letter-spacing: 0; }
+.price-card button,.portal-button { align-self: end; min-height: 39px; border: 0; border-radius: 4px; background: #2f4652; color: #fff; font: 600 12px Inter, Arial, sans-serif; cursor: pointer; }
+.price-card button:disabled,.portal-button:disabled { opacity: .55; cursor: wait; }
+.subscriptions .price-card:nth-child(2) { border-color: #82a3b0; box-shadow: inset 0 3px #527a89; }
+.portal-button { padding: 10px 13px; background: #dbe6ea; color: #2d4754; }
+.billing-note { margin: 26px 0 0; padding-top: 18px; border-top: 1px solid #dbe4e8; color: #667780; font-size: 12px; line-height: 1.5; }
 
 @media (max-width: 680px) {
   .hero { padding-top: 44px; }
   .hero h1 { font-size: clamp(46px, 13vw, 64px); }
   .auth-panel { padding: 25px 22px; }
+  .billing-overlay { padding: 15px 10px; }
+  .billing-panel { padding: 27px 18px; }
+  .billing-heading { display: grid; }
+  .credit-balance { min-width: 0; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .billing-section-title { align-items: flex-end; }
   .header-actions .pill { display: none; }
   .run-picker { grid-template-columns: 1fr; gap: 6px; }
   .paper-run-selector { grid-template-columns: 1fr; gap: 10px; }
