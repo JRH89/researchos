@@ -3,6 +3,5 @@ node_modules
 coverage
 .env*
 !.env.example
-!.env.local.example
-!.env.production.example
-!.env.pages.example
+*-firebase-adminsdk-*.json
+firebase-service-account*.json

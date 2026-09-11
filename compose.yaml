@@ -3,16 +3,16 @@ services:
     image: postgres:16-alpine
     container_name: researchos-postgres
     environment:
-      POSTGRES_DB: researchos_test
+      POSTGRES_DB: ${RESEARCHOS_DB_NAME:-researchos_test}
       POSTGRES_USER: researchos
-      POSTGRES_PASSWORD: researchos_local_only
+      POSTGRES_PASSWORD: ${RESEARCHOS_DB_PASSWORD:-researchos_local_only}
     ports:
       - "5433:5432"
     volumes:
       - researchos_postgres:/var/lib/postgresql/data
       - ./db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U researchos -d researchos_test"]
+      test: ["CMD-SHELL", "pg_isready -U researchos -d $${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
       retries: 20
