@@ -10,7 +10,7 @@ services:
       - "5433:5432"
     volumes:
       - researchos_postgres:/var/lib/postgresql/data
-      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+      - ./apps/api/db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U researchos -d $${POSTGRES_DB}"]
       interval: 3s

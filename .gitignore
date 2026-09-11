@@ -2,6 +2,7 @@ node_modules
 .next
 coverage
 tsconfig.tsbuildinfo
+apps/**/out
 .env*
 !.env.example
 *-firebase-adminsdk-*.json

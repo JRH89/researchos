@@ -1,0 +1,12 @@
+.git
+.next
+apps/*/.next
+apps/*/out
+node_modules
+apps/*/node_modules
+.env
+.env.*
+!/.env.example
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
+coverage

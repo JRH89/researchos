@@ -1,0 +1,9 @@
+export type Evidence = { id: string; sourceTitle: string; sourceUrl: string; excerpt: string; authors?: string[]; publishedDate?: string; publisher?: string; siteName?: string; retrievedAt: string; server: string; toolCallId: string; traceStepId: string };
+export type TraceEvent = { id: string; at: string; kind: "plan" | "tool" | "evaluation" | "approval" | "recovery" | "synthesis"; message: string; detail?: string; status: "complete" | "warning" | "blocked" };
+export type Claim = { id: string; text: string; confidence: "high" | "medium" | "low"; evidenceIds: string[] };
+export type ResearchSession = { id: string; question: string; status: "complete" | "needs-approval" | "partial" | "failed"; objectives: string[]; report: { summary: string; claims: Claim[]; limitations: string[] }; trace: TraceEvent[]; evidence: Evidence[]; budget: { iterationsUsed: number; toolCallsUsed: number; maxIterations: number; maxToolCalls: number; elapsedMs: number } };
+export type CitationStyle = "APA" | "MLA";
+export type Workspace = { id: string; name: string; description: string; createdAt: string };
+export type WorkspaceRun = { id: string; question: string; status: ResearchSession["status"]; createdAt: string };
+export type WritingProfile = { id: string; name: string; authorName: string; courseName: string; instructorName: string; citationStyle: CitationStyle; targetWordCount: number };
+export type WorkspacePaper = { id: string; workspaceId: string; title: string; contentMarkdown: string; citations: unknown[]; sourceSessionIds: string[]; citationStyle: CitationStyle; targetWordCount: number; paperMetadata: { authorName: string; courseName: string; instructorName: string; date: string; paperType?: "research-paper" | "essay" }; createdAt: string };

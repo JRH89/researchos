@@ -1,53 +1,43 @@
 # ResearchOS
 
-An MCP-powered technical research agent with a visible execution trace and statement-level provenance.
+ResearchOS is an evidence-backed research workspace. It plans research, dynamically discovers MCP tools, validates returned evidence, and preserves the path from a report claim to its source, tool call, and execution trace.
 
-## What is implemented
+## Monorepo architecture
 
-- Real stdio MCP discovery through the official MCP client: ResearchOS spawns configured servers, lists their tools, calls selected tools, and closes each transport after the run.
-- Bounded plan → execute → evaluate → synthesize loop with time, iteration, and tool-call budgets.
-- Read-only auto-execution and approval gates for mutating/costly tools.
-- Validated tool results, recoverable tool errors, structured trace events, and evidence-backed claims.
-- A Next.js trace UI where every claim opens its source excerpt and originating MCP call.
-- Claude Messages API and OpenAI Responses-compatible adapters for live planning, tool selection, and structured synthesis. Claude is selected when `ANTHROPIC_API_KEY` is set.
-- PostgreSQL-backed durable session persistence when `DATABASE_URL` is configured.
-- An explicit local deterministic fallback, enabled only with `RESEARCHOS_DEMO_MODE=true`.
+| Package | Responsibility | Deployment |
+| --- | --- | --- |
+| `apps/web` | Static Next.js frontend, Firebase client authentication, research and paper UX | Cloudflare Pages at `research-os.org` |
+| `apps/api` | Node API, Firebase Admin verification, PostgreSQL persistence, billing, research orchestration, and MCP client | Home server at `api.research-os.org` through Cloudflare Tunnel |
 
-## Run
+The API is the only service that receives database, model, Stripe, Firebase Admin, MCP, and tunnel secrets. Pages receives only browser-safe `NEXT_PUBLIC_*` values.
 
-```powershell
-npm.cmd install
-npm.cmd run dev
+## What it does
+
+- Connects to real stdio MCP servers, discovers their tools at runtime, and only auto-runs read-only tools.
+- Uses bounded planning, tool-call, time, and iteration budgets.
+- Treats tool output as untrusted and validates it before it reaches model context.
+- Stores workspaces, saved runs, cited papers, writing profiles, and short-lived unfiled sessions in PostgreSQL.
+- Streams research and paper-writing progress to the interface.
+- Supports APA and MLA essays or research papers, source limits, DOCX/PDF/Markdown exports, and evidence provenance.
+- Uses Firebase Authentication and reserves internal credits before paid research or paper runs.
+
+## Development
+
+Use the single root `.env` file, based on `.env.example`. Start PostgreSQL with `docker compose up -d`, apply migrations with `npm run db:migrate`, then run the two processes separately:
+
+```
+npm run dev:api
+npm run dev:web
 ```
 
-Copy `.env.example` to `.env.local`, configure your local values, apply all database migrations, then open `http://localhost:3000`. Tests: `npm.cmd test`.
+The frontend is served at `http://localhost:3000` and automatically calls `http://localhost:3001` during local development, even when the root environment is configured for production URLs.
 
-## Local test stack
+Run `npm run build` to produce both deployable applications. The static Pages artifact is `apps/web/out`.
 
-This repo includes a real local PostgreSQL database and stdio MCP server. Start the database, then create your local environment file from the one template:
+## Production
 
-```powershell
-docker compose up -d
-Copy-Item .env.example .env.local
-npm.cmd run test:db
-npm.cmd run test:mcp
-npm.cmd run dev
-```
+The intended production deployment is documented in [docs/deployment.md](docs/deployment.md). `compose.production.yaml` runs PostgreSQL, migrations, the API/MCP host, and Cloudflare Tunnel on the home server. Cloudflare Pages builds only `apps/web`.
 
-The MCP server in `mcp/local-research-server.mjs` is a protocol-real, read-only test server with a small local corpus. It lets you validate discovery, invocation, result validation, trace capture, and persistence without external API keys.
+## Safety model
 
-## Live web research with Claude
-
-`mcp/claude-web-search-server.mjs` exposes Claude's server-side web search as a separate, read-only MCP tool. Add it to `MCP_SERVERS_JSON` in your `.env.local`; it inherits `ANTHROPIC_API_KEY` from the application environment and turns returned web citations into ResearchOS evidence records. Each tool run permits up to three web searches, so keep this server behind the existing session budget. Anthropic charges web-search requests separately from model tokens; see its current pricing before using it at scale.
-
-## Connecting real MCP servers
-
-Set `MCP_SERVERS_JSON` to a JSON array of stdio server definitions. The client dynamically calls `listTools()` and exposes the resulting catalog to the model; no server-specific tool names are in the agent. Keep credentials inside each server's `env` object or its own secret manager.
-
-For evidence provenance, configure research MCP tools to return a JSON text block in this shape:
-
-```json
-{ "sources": [{ "title": "Source title", "url": "https://example.com", "excerpt": "Verbatim supporting passage" }] }
-```
-
-Invalid tool output is rejected and shown as a recoverable trace event. `GET /api/research/:id` retrieves a persisted session when PostgreSQL is configured.
+ResearchOS never turns unlinked text into a factual report claim. Every reported claim retains evidence records, which retain their MCP server, tool-call, and trace-step IDs. Paid or mutating tools remain approval-gated.
