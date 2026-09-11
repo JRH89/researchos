@@ -20,15 +20,15 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Copy `.env.example` to `.env.local`, configure an MCP server and `OPENAI_API_KEY`, apply `db/migrations/001_research_sessions.sql`, then open `http://localhost:3000`. Tests: `npm.cmd test`.
+Copy `.env.example` to `.env.local`, configure your local values, apply all database migrations, then open `http://localhost:3000`. Tests: `npm.cmd test`.
 
 ## Local test stack
 
-This repo includes a real local PostgreSQL database and stdio MCP server. Start the database, then copy `.env.local.example` to `.env.local`:
+This repo includes a real local PostgreSQL database and stdio MCP server. Start the database, then create your local environment file from the one template:
 
 ```powershell
 docker compose up -d
-Copy-Item .env.local.example .env.local
+Copy-Item .env.example .env.local
 npm.cmd run test:db
 npm.cmd run test:mcp
 npm.cmd run dev
@@ -38,7 +38,7 @@ The MCP server in `mcp/local-research-server.mjs` is a protocol-real, read-only 
 
 ## Live web research with Claude
 
-`mcp/claude-web-search-server.mjs` exposes Claude's server-side web search as a separate, read-only MCP tool. Add it to `MCP_SERVERS_JSON` as shown in `.env.local.example`; it inherits `ANTHROPIC_API_KEY` from the application environment and turns returned web citations into ResearchOS evidence records. Each tool run permits up to three web searches, so keep this server behind the existing session budget. Anthropic charges web-search requests separately from model tokens; see its current pricing before using it at scale.
+`mcp/claude-web-search-server.mjs` exposes Claude's server-side web search as a separate, read-only MCP tool. Add it to `MCP_SERVERS_JSON` in your `.env.local`; it inherits `ANTHROPIC_API_KEY` from the application environment and turns returned web citations into ResearchOS evidence records. Each tool run permits up to three web searches, so keep this server behind the existing session budget. Anthropic charges web-search requests separately from model tokens; see its current pricing before using it at scale.
 
 ## Connecting real MCP servers
 
