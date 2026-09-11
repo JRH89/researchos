@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./styles.css";
 import "./theme.css";
+import "./auth.css";
 
 export const metadata: Metadata = {
   title: "ResearchOS — evidence, not just answers",

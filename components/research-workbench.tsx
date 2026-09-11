@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { GoogleAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, type User } from "firebase/auth";
 import type { Evidence, ResearchSession } from "@/lib/research/contracts";
-import type { Workspace, WorkspacePaper } from "@/lib/research/store";
+import type { Workspace, WorkspacePaper, WorkspaceRun } from "@/lib/research/store";
 import { firebaseAuth, firebaseConfigured } from "@/lib/auth/firebase-client";
 
-const api = (path: string) => `${process.env.NEXT_PUBLIC_API_BASE_URL || ""}${path}`;
+const api = (path: string) => {
+  const localBrowser = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  return `${localBrowser ? "" : process.env.NEXT_PUBLIC_API_BASE_URL || ""}${path}`;
+};
 
 const defaultQuestion = "Compare approaches for running coding agents against local LLMs with 12–16 GB VRAM.";
 const kindIcon: Record<string, string> = { plan: "◎", tool: "→", evaluation: "✓", approval: "◌", recovery: "!", synthesis: "✦" };
@@ -28,6 +31,7 @@ export function ResearchWorkbench() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
   const [paper, setPaper] = useState<WorkspacePaper | null>(null);
+  const [workspaceRuns, setWorkspaceRuns] = useState<WorkspaceRun[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -45,6 +49,7 @@ export function ResearchWorkbench() {
     return onAuthStateChanged(firebaseAuth(), async (nextUser) => { setUser(nextUser); setIdToken(nextUser ? await nextUser.getIdToken() : null); });
   }, []);
   useEffect(() => { if (!idToken) { setWorkspaces([]); return; } void fetch(api("/api/workspaces"), { headers: { Authorization: `Bearer ${idToken}` } }).then((response) => response.ok ? response.json() : []).then(setWorkspaces).catch(() => setWorkspaces([])); }, [idToken]);
+  useEffect(() => { if (!idToken || !workspaceId) { setWorkspaceRuns([]); return; } void fetch(api(`/api/workspaces/${workspaceId}/sessions`), { headers: { Authorization: `Bearer ${idToken}` } }).then((response) => response.ok ? response.json() : []).then(setWorkspaceRuns).catch(() => setWorkspaceRuns([])); }, [idToken, workspaceId, session?.id]);
   const authenticatedHeaders = () => ({ "Content-Type": "application/json", ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) });
   async function withAuth(action: () => Promise<void>) { setAuthError(null); setAuthLoading(true); try { await action(); } catch (cause) { setAuthError(cause instanceof Error ? cause.message : "Sign-in failed."); } finally { setAuthLoading(false); } }
   async function signInGoogle() { await withAuth(() => signInWithPopup(firebaseAuth(), new GoogleAuthProvider()).then(() => undefined)); }
@@ -86,12 +91,14 @@ export function ResearchWorkbench() {
     const response = await fetch(api(`/api/workspaces/${workspaceId}/papers`), { method: "POST", headers: authenticatedHeaders(), body: JSON.stringify({}) });
     const body = await response.json(); if (!response.ok) { setError(body.error || "Could not draft a paper."); return; } setPaper(body);
   }
+  async function openWorkspaceRun(runId: string) { if (!runId || !idToken) return; const response = await fetch(api(`/api/research/${runId}`), { headers: { Authorization: `Bearer ${idToken}` } }); if (!response.ok) { setError("That saved research run is no longer available."); return; } setSelectedEvidence([]); setPaper(null); setSession(await response.json()); }
   async function downloadPaper(format: "docx" | "pdf" | "markdown") { if (!paper || !idToken) return; const response = await fetch(api(`/api/papers/${paper.id}/export?format=${format}`), { headers: { Authorization: `Bearer ${idToken}` } }); if (!response.ok) { setError("Could not download the paper."); return; } const url = URL.createObjectURL(await response.blob()); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${paper.title}.${format === "markdown" ? "md" : format}`; anchor.click(); URL.revokeObjectURL(url); }
   return <div className="shell">
-    <header><div className="brand"><span className="mark">R</span><span>ResearchOS</span></div><span className="pill">MCP research runtime</span>{user && <button type="button" onClick={() => void signOut(firebaseAuth())}>Sign out</button>}</header>
-    {!user && <section className="auth-panel"><p className="eyebrow">Sign in to ResearchOS</p><button type="button" disabled={authLoading || !firebaseConfigured} onClick={() => void signInGoogle()}>Continue with Google</button><div><input aria-label="Email" type="email" value={email} placeholder="Email address" onChange={(event) => setEmail(event.target.value)} /><input aria-label="Password" type="password" value={password} placeholder="Password" onChange={(event) => setPassword(event.target.value)} /><button type="button" disabled={authLoading || !email || password.length < 6} onClick={() => void signInEmail(false)}>Sign in</button><button type="button" disabled={authLoading || !email || password.length < 6} onClick={() => void signInEmail(true)}>Create account</button></div>{authError && <p className="run-error" role="alert">{authError}</p>}</section>}
+    <header><div className="brand"><span className="mark">R</span><span>ResearchOS</span></div><div className="header-actions"><span className="pill">MCP research runtime</span>{user && <button type="button" onClick={() => void signOut(firebaseAuth())}>Sign out</button>}</div></header>
+    {!user && <div className="auth-overlay"><section className="auth-panel" role="dialog" aria-modal="true" aria-labelledby="auth-title"><p className="eyebrow">ResearchOS account</p><h2 id="auth-title">Research with a record.</h2><p className="auth-copy">Sign in to save workspaces, evidence trails, and cited papers.</p><button className="google-button" type="button" disabled={authLoading || !firebaseConfigured} onClick={() => void signInGoogle()}>Continue with Google</button><div className="auth-divider"><span>or use email</span></div><label>Email address<input type="email" value={email} placeholder="you@example.com" autoComplete="email" onChange={(event) => setEmail(event.target.value)} /></label><label>Password<input type="password" value={password} placeholder="At least 6 characters" autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} /></label><div className="auth-actions"><button type="button" disabled={authLoading || !email || password.length < 6} onClick={() => void signInEmail(false)}>Sign in</button><button className="secondary" type="button" disabled={authLoading || !email || password.length < 6} onClick={() => void signInEmail(true)}>Create account</button></div>{authError && <p className="run-error" role="alert">{authError}</p>}</section></div>}
     <section className="hero"><p className="eyebrow">Evidence, not just answers</p><h1>Watch a research agent<br /><em>earn its conclusions.</em></h1><p className="lede">Plans, dynamically discovers MCP tools, evaluates sources, and preserves the path from each claim to its evidence.</p></section>
     <section className="workspace-picker"><label htmlFor="workspace">Research workspace</label><select id="workspace" value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)}><option value="">Unfiled session</option>{workspaces.map((workspace) => <option value={workspace.id} key={workspace.id}>{workspace.name}</option>)}</select><button type="button" onClick={createNewWorkspace}>New workspace</button></section>
+    {workspaceId && <section className="run-picker"><label htmlFor="saved-run">Saved research</label><select id="saved-run" value={session?.id || ""} onChange={(event) => void openWorkspaceRun(event.target.value)}><option value="">Choose a previous research run</option>{workspaceRuns.map((run) => <option value={run.id} key={run.id}>{run.question.slice(0, 72)}{run.question.length > 72 ? "…" : ""}</option>)}</select><small>{workspaceRuns.length ? `${workspaceRuns.length} saved run${workspaceRuns.length === 1 ? "" : "s"} in this workspace` : "New research in this workspace will be saved here."}</small></section>}
     <section className="question"><label htmlFor="question">Research question</label><textarea id="question" value={question} onChange={(e) => setQuestion(e.target.value)} /><button onClick={run} disabled={running || !user}>{running ? "Running bounded research…" : user ? "Run research →" : "Sign in to run research"}</button><small>Read-only tools run automatically. Mutating and paid tools stop for approval.</small></section>
     {error && <p className="run-error" role="alert">Research run failed: {error}</p>}
     {running && <div className="live-overlay" role="dialog" aria-modal="true" aria-labelledby="live-agent-title"><section className="live-run" aria-live="polite"><div className="section-title"><p className="eyebrow" id="live-agent-title">Live agent activity</p><span>{Math.min(92, 8 + liveTrace.length * 11)}%</span></div><div className="progress"><i style={{ width: `${Math.min(92, 8 + liveTrace.length * 11)}%` }} /></div><p className="stream-note">Showing the newest five events. Scroll up to inspect earlier activity.</p><div className="stream-list" ref={streamListRef} onScroll={updateFollowMode}>{liveTrace.length ? liveTrace.map((item) => <div className={`trace-item ${item.status}`} key={item.id}><i>{kindIcon[item.kind]}</i><strong>{item.message}</strong></div>) : <p className="waiting">Connecting to research runtime…</p>}</div></section></div>}
