@@ -1,29 +1,28 @@
-import { synthesize } from "./model";
+import { writePaperBody } from "./model";
 import { savePaper, workspaceSessions, type CitationStyle, type PaperMetadata, type WorkspacePaper } from "./store";
 
 type PaperInput = { sessionIds?: unknown; title?: unknown; citationStyle?: unknown; targetWordCount?: unknown; paperType?: unknown; metadata?: unknown };
 type Progress = (message: string, progress: number) => void;
 
-export async function draftWorkspacePaper(workspaceId: string, ownerUid: string, body: PaperInput, progress: Progress = () => {}) : Promise<WorkspacePaper> {
+export async function draftWorkspacePaper(workspaceId: string, ownerUid: string, input: PaperInput, progress: Progress = () => {}) : Promise<WorkspacePaper> {
   progress("Validating saved research and evidence.", 12);
   const sessions = await workspaceSessions(workspaceId, ownerUid);
-  const selectedIds = Array.isArray(body.sessionIds) ? new Set(body.sessionIds.filter((id): id is string => typeof id === "string")) : new Set(sessions.map((session) => session.id));
+  const selectedIds = Array.isArray(input.sessionIds) ? new Set(input.sessionIds.filter((id): id is string => typeof id === "string")) : new Set(sessions.map((session) => session.id));
   const selected = sessions.filter((session) => selectedIds.has(session.id));
   const evidence = selected.flatMap((session) => session.evidence).filter((item, index, all) => all.findIndex((other) => other.sourceUrl === item.sourceUrl && other.excerpt === item.excerpt) === index);
   if (!evidence.length) throw new Error("Select completed research sessions with evidence before drafting a paper.");
-  const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "Workspace research paper";
-  const citationStyle: CitationStyle = body.citationStyle === "MLA" ? "MLA" : "APA";
-  const targetWordCount = Math.max(250, Math.min(10000, typeof body.targetWordCount === "number" ? body.targetWordCount : 1000));
-  const rawMetadata = typeof body.metadata === "object" && body.metadata ? body.metadata as Record<string, unknown> : {};
-  const paperType = body.paperType === "essay" ? "essay" : "research-paper";
+  const title = typeof input.title === "string" && input.title.trim() ? input.title.trim() : "Workspace research paper";
+  const citationStyle: CitationStyle = input.citationStyle === "MLA" ? "MLA" : "APA";
+  const targetWordCount = Math.max(250, Math.min(10000, typeof input.targetWordCount === "number" ? input.targetWordCount : 1000));
+  const rawMetadata = typeof input.metadata === "object" && input.metadata ? input.metadata as Record<string, unknown> : {};
+  const paperType = input.paperType === "essay" ? "essay" : "research-paper";
   const metadata: PaperMetadata = { authorName: typeof rawMetadata.authorName === "string" ? rawMetadata.authorName.trim() : "", courseName: typeof rawMetadata.courseName === "string" ? rawMetadata.courseName.trim() : "", instructorName: typeof rawMetadata.instructorName === "string" ? rawMetadata.instructorName.trim() : "", date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), paperType };
   progress(`Writing a ${citationStyle} ${paperType === "essay" ? "essay" : "research paper"} from ${evidence.length} evidence records.`, 42);
-  const report = await synthesize(`Write a comprehensive ${citationStyle}-style ${paperType === "essay" ? "essay" : "research paper"} titled '${title}' from the selected workspace evidence. Aim for approximately ${targetWordCount} words. Use only supplied evidence and do not invent facts.`, evidence);
+  const body = await writePaperBody({ title, paperType, citationStyle, targetWordCount, evidence });
   progress("Formatting headings, citations, and references.", 76);
-  const heading = citationStyle === "MLA" ? `${metadata.authorName}\n${metadata.instructorName}\n${metadata.courseName}\n${metadata.date}\n\n# ${title}` : `# ${title}\n\n${metadata.authorName}\n${metadata.courseName}\n${metadata.instructorName}\n${metadata.date}`;
-  const abstract = paperType === "research-paper" ? `## Abstract\n\n${report.summary}\n\n` : "";
+  const heading = citationStyle === "MLA" ? `${metadata.authorName}  \n${metadata.instructorName}  \n${metadata.courseName}  \n${metadata.date}\n\n# ${title}` : `# ${title}\n\n${metadata.authorName}  \n${metadata.courseName}  \n${metadata.instructorName}  \n${metadata.date}`;
   const referencesTitle = citationStyle === "MLA" ? "Works Cited" : "References";
-  const markdown = `${heading}\n\n${abstract}## Findings\n\n${report.claims.map((claim, index) => `### ${index + 1}. ${claim.text}\n\nEvidence: ${claim.evidenceIds.map((id) => `[${evidence.findIndex((item) => item.id === id) + 1}]`).join(", ")}`).join("\n\n")}\n\n## Limitations\n\n${report.limitations.map((item) => `- ${item}`).join("\n")}\n\n---\n\n## ${referencesTitle}\n\n${evidence.map((item) => `${citationStyle === "MLA" ? `${item.sourceTitle}. ` : ""}${item.sourceTitle}. ${item.sourceUrl}`).join("\n")}`;
+  const markdown = `${heading}\n\n${body}\n\n---\n\n## ${referencesTitle}\n\n${evidence.map((item) => `${citationStyle === "MLA" ? `${item.sourceTitle}. ` : ""}${item.sourceTitle}. ${item.sourceUrl}`).join("\n")}`;
   progress("Saving the paper to this workspace.", 92);
   return savePaper(ownerUid, { workspaceId, title, contentMarkdown: markdown, citations: evidence, sourceSessionIds: selected.map((session) => session.id), citationStyle, targetWordCount, paperMetadata: metadata });
 }

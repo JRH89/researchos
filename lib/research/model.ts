@@ -49,3 +49,23 @@ export async function synthesize(question: string, evidence: Evidence[]): Promis
   if (result?.claims.length) return { ...result, claims: result.claims.slice(0, 6), limitations: result.limitations.slice(0, 5) };
   return { summary: "Research completed from the connected sources. Review each claim's evidence chain before acting on the result.", claims: evidence.slice(0, 3).map((item) => ({ text: item.excerpt, confidence: "medium" as const, evidenceIds: [item.id] })), limitations: ["No LLM adapter is configured, so this fallback preserves source excerpts instead of generating interpretive synthesis."] };
 }
+
+export async function writePaperBody(input: { title: string; paperType: "research-paper" | "essay"; citationStyle: "APA" | "MLA"; targetWordCount: number; evidence: Evidence[] }): Promise<string> {
+  const sources = input.evidence.map((item, index) => `[${index + 1}] ${item.sourceTitle}\nURL: ${item.sourceUrl}\nEvidence: ${item.excerpt}`).join("\n\n");
+  const abstractRule = input.paperType === "research-paper" ? "Start with a concise `## Abstract` section, then write the body." : "Do not include an abstract.";
+  const prompt = `Write the complete body of a ${input.citationStyle}-style ${input.paperType === "essay" ? "academic essay" : "research paper"} titled "${input.title}". ${abstractRule}
+
+Write approximately ${input.targetWordCount} words. This must read as connected academic prose: an introduction with a clear thesis, multiple developed body paragraphs that compare or explain the evidence, and a conclusion. Do not produce a list of claims, an outline, a Findings heading, or a Limitations section. Cite every factual statement using only the supplied numbered sources in inline form like [1] or [1, 2]. Do not invent facts, sources, or citations. Do not include the title, student heading, References, or Works Cited; those are added separately.
+
+Sources:\n${sources}`;
+  const anthropic = claude();
+  if (anthropic) {
+    const response = await anthropic.messages.create({ model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929", max_tokens: Math.min(8000, Math.max(1600, Math.ceil(input.targetWordCount * 2))), messages: [{ role: "user", content: prompt }] });
+    const text = response.content.filter((block) => block.type === "text").map((block) => block.text).join("\n").trim();
+    if (text) return text;
+  }
+  const api = client();
+  if (api) { const response = await api.responses.create({ model: process.env.OPENAI_MODEL || "gpt-5-mini", input: prompt }); if (response.output_text.trim()) return response.output_text.trim(); }
+  const paragraphs = input.evidence.slice(0, 4).map((item, index) => `The available evidence supports a key part of this discussion: ${item.excerpt} [${index + 1}].`);
+  return `${input.paperType === "research-paper" ? "## Abstract\n\nThis paper synthesizes the available source evidence and identifies its practical implications.\n\n" : ""}## Introduction\n\nThis essay examines ${input.title.toLowerCase()} using the available evidence.\n\n${paragraphs.join("\n\n")}\n\n## Conclusion\n\nThe available sources support these findings, though readers should weigh their limitations before applying them.`;
+}
