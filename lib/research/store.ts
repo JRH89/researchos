@@ -3,7 +3,7 @@ import type { ResearchSession } from "./contracts";
 
 export type Workspace = { id: string; name: string; description: string; createdAt: string };
 export type CitationStyle = "APA" | "MLA";
-export type PaperMetadata = { authorName: string; courseName: string; instructorName: string; date: string };
+export type PaperMetadata = { authorName: string; courseName: string; instructorName: string; date: string; paperType?: "research-paper" | "essay" };
 export type WorkspacePaper = { id: string; workspaceId: string; title: string; contentMarkdown: string; citations: unknown[]; sourceSessionIds: string[]; citationStyle: CitationStyle; targetWordCount: number; paperMetadata: PaperMetadata; createdAt: string };
 export type WorkspaceRun = { id: string; question: string; status: ResearchSession["status"]; createdAt: string };
 export type WritingProfile = { id: string; name: string; authorName: string; courseName: string; instructorName: string; citationStyle: CitationStyle; targetWordCount: number };

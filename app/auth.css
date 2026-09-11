@@ -61,6 +61,8 @@
 .paper-content h3 { margin: 24px 0 8px; font: 600 15px/1.4 Inter, Arial, sans-serif; }
 .paper-content p { margin: 0 0 16px; }
 .paper-content ul { margin: 0 0 16px; padding-left: 22px; }
+.paper-content hr { border: 0; border-top: 1px dashed #c9d3d8; margin: 42px 0 0; break-after: page; page-break-after: always; }
+.paper-content hr + h2 { margin-top: 42px; }
 
 @media (max-width: 680px) {
   .hero { padding-top: 44px; }
