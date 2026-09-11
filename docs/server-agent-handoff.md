@@ -100,7 +100,7 @@ Run these checks on the server:
 
 ```bash
 docker compose -f compose.production.yaml ps
-curl -fsS http://127.0.0.1:3001/api/health
+curl -fsS http://127.0.0.1:3002/api/health
 curl -fsS https://api.research-os.org/api/health
 ```
 
