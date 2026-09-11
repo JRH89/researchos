@@ -51,11 +51,12 @@ export async function synthesize(question: string, evidence: Evidence[]): Promis
 }
 
 export async function writePaperBody(input: { title: string; paperType: "research-paper" | "essay"; citationStyle: "APA" | "MLA"; targetWordCount: number; evidence: Evidence[] }): Promise<string> {
-  const sources = input.evidence.map((item, index) => `[${index + 1}] ${item.sourceTitle}\nURL: ${item.sourceUrl}\nEvidence: ${item.excerpt}`).join("\n\n");
+  const citation = (item: Evidence) => input.citationStyle === "APA" ? `(${item.authors?.[0]?.split(" ").at(-1) || `“${item.sourceTitle}”`}, ${item.publishedDate?.slice(0, 4) || "n.d."})` : `(${item.authors?.[0]?.split(" ").at(-1) || `“${item.sourceTitle}”`})`;
+  const sources = input.evidence.map((item, index) => `[${index + 1}] Cite in text as ${citation(item)}\nTitle: ${item.sourceTitle}\nAuthor: ${item.authors?.join(", ") || "not supplied"}\nDate: ${item.publishedDate || "not supplied"}\nPublisher/site: ${item.publisher || item.siteName || "not supplied"}\nURL: ${item.sourceUrl}\nEvidence: ${item.excerpt}`).join("\n\n");
   const abstractRule = input.paperType === "research-paper" ? "Start with a concise `## Abstract` section, then write the body." : "Do not include an abstract.";
   const prompt = `Write the complete body of a ${input.citationStyle}-style ${input.paperType === "essay" ? "academic essay" : "research paper"} titled "${input.title}". ${abstractRule}
 
-Write approximately ${input.targetWordCount} words. This must read as connected academic prose: an introduction with a clear thesis, multiple developed body paragraphs that compare or explain the evidence, and a conclusion. Do not produce a list of claims, an outline, a Findings heading, or a Limitations section. Cite every factual statement using only the supplied numbered sources in inline form like [1] or [1, 2]. Do not invent facts, sources, or citations. Do not include the title, student heading, References, or Works Cited; those are added separately.
+Write approximately ${input.targetWordCount} words. This must read as connected academic prose: an introduction with a clear thesis, multiple developed body paragraphs that compare or explain the evidence, and a conclusion. Do not produce a list of claims, an outline, a Findings heading, or a Limitations section. Cite factual statements using the supplied style-specific in-text forms. Do not invent facts, source metadata, or citations. Do not include the title, student heading, References, or Works Cited; those are added separately.
 
 Sources:\n${sources}`;
   const anthropic = claude();
@@ -66,6 +67,7 @@ Sources:\n${sources}`;
   }
   const api = client();
   if (api) { const response = await api.responses.create({ model: process.env.OPENAI_MODEL || "gpt-5-mini", input: prompt }); if (response.output_text.trim()) return response.output_text.trim(); }
-  const paragraphs = input.evidence.slice(0, 4).map((item, index) => `The available evidence supports a key part of this discussion: ${item.excerpt} [${index + 1}].`);
+  const cite = (item: Evidence) => input.citationStyle === "APA" ? `(${item.authors?.[0]?.split(" ").at(-1) || `“${item.sourceTitle}”`}, ${item.publishedDate?.slice(0, 4) || "n.d."})` : `(${item.authors?.[0]?.split(" ").at(-1) || `“${item.sourceTitle}”`})`;
+  const paragraphs = input.evidence.slice(0, 4).map((item) => `The available evidence supports a key part of this discussion: ${item.excerpt} ${cite(item)}.`);
   return `${input.paperType === "research-paper" ? "## Abstract\n\nThis paper synthesizes the available source evidence and identifies its practical implications.\n\n" : ""}## Introduction\n\nThis essay examines ${input.title.toLowerCase()} using the available evidence.\n\n${paragraphs.join("\n\n")}\n\n## Conclusion\n\nThe available sources support these findings, though readers should weigh their limitations before applying them.`;
 }

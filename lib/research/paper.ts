@@ -1,8 +1,13 @@
 import { writePaperBody } from "./model";
 import { savePaper, workspaceSessions, type CitationStyle, type PaperMetadata, type WorkspacePaper } from "./store";
+import type { Evidence } from "./contracts";
 
 type PaperInput = { sessionIds?: unknown; title?: unknown; citationStyle?: unknown; targetWordCount?: unknown; paperType?: unknown; metadata?: unknown };
 type Progress = (message: string, progress: number) => void;
+const reference = (item: Evidence, style: CitationStyle) => {
+  const date = item.publishedDate || "n.d."; const author = item.authors?.join(", ");
+  return style === "APA" ? `${author ? `${author}. ` : ""}${item.sourceTitle}. (${date}). ${item.publisher || item.siteName ? `${item.publisher || item.siteName}. ` : ""}${item.sourceUrl}` : `${author ? `${author}. ` : ""}“${item.sourceTitle}.” ${item.publisher || item.siteName ? `${item.publisher || item.siteName}, ` : ""}${date}, ${item.sourceUrl}.`;
+};
 
 export async function draftWorkspacePaper(workspaceId: string, ownerUid: string, input: PaperInput, progress: Progress = () => {}) : Promise<WorkspacePaper> {
   progress("Validating saved research and evidence.", 12);
@@ -20,9 +25,11 @@ export async function draftWorkspacePaper(workspaceId: string, ownerUid: string,
   progress(`Writing a ${citationStyle} ${paperType === "essay" ? "essay" : "research paper"} from ${evidence.length} evidence records.`, 42);
   const body = await writePaperBody({ title, paperType, citationStyle, targetWordCount, evidence });
   progress("Formatting headings, citations, and references.", 76);
-  const heading = citationStyle === "MLA" ? `${metadata.authorName}  \n${metadata.instructorName}  \n${metadata.courseName}  \n${metadata.date}\n\n# ${title}` : `# ${title}\n\n${metadata.authorName}  \n${metadata.courseName}  \n${metadata.instructorName}  \n${metadata.date}`;
+  const mlaHeading = `${metadata.authorName}  \n${metadata.instructorName}  \n${metadata.courseName}  \n${metadata.date}\n\n# ${title}`;
+  const apaTitlePage = `# ${title}\n\n${metadata.authorName}  \n${metadata.courseName}  \n${metadata.instructorName}  \n${metadata.date}`;
+  const heading = citationStyle === "MLA" ? mlaHeading : `${apaTitlePage}\n\n---\n\n# ${title}`;
   const referencesTitle = citationStyle === "MLA" ? "Works Cited" : "References";
-  const markdown = `${heading}\n\n${body}\n\n---\n\n## ${referencesTitle}\n\n${evidence.map((item) => `${citationStyle === "MLA" ? `${item.sourceTitle}. ` : ""}${item.sourceTitle}. ${item.sourceUrl}`).join("\n")}`;
+  const markdown = `${heading}\n\n${body}\n\n---\n\n## ${referencesTitle}\n\n${evidence.map((item) => reference(item, citationStyle)).join("\n\n")}`;
   progress("Saving the paper to this workspace.", 92);
   return savePaper(ownerUid, { workspaceId, title, contentMarkdown: markdown, citations: evidence, sourceSessionIds: selected.map((session) => session.id), citationStyle, targetWordCount, paperMetadata: metadata });
 }

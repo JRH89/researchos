@@ -15,7 +15,7 @@ export async function discoverTools(): Promise<DiscoveredTool[]> {
 export async function invokeForEvidence(tool: DiscoveredTool, input: Record<string, unknown>, traceStepId: string): Promise<Evidence[]> {
   const toolCallId = crypto.randomUUID();
   const result = rawToolResultSchema.parse(normalizeToolResult(await tool.transport.callTool(tool.name, input)));
-  return result.sources.map((source) => ({ id: crypto.randomUUID(), sourceTitle: source.title, sourceUrl: source.url, excerpt: source.excerpt, retrievedAt: new Date().toISOString(), server: tool.server, toolCallId, traceStepId }));
+  return result.sources.map((source) => ({ id: crypto.randomUUID(), sourceTitle: source.title, sourceUrl: source.url, excerpt: source.excerpt, authors: source.authors, publishedDate: source.publishedDate, publisher: source.publisher, siteName: source.siteName, retrievedAt: new Date().toISOString(), server: tool.server, toolCallId, traceStepId }));
 }
 
 function normalizeToolResult(raw: unknown): unknown {
