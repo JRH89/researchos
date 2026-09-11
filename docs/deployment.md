@@ -9,6 +9,9 @@ Serve the frontend through Cloudflare Pages at `https://research-os.org`. Run th
 3. Put database, Anthropic, Stripe, MCP, and Tunnel credentials in the home-server environment only.
 4. Set `NEXT_PUBLIC_API_BASE_URL=https://api.research-os.org` in Pages build settings.
 5. Split browser calls from relative `/api` paths to that API base URL, then enforce CORS only for `https://research-os.org`.
-6. Before launch, add authentication, API rate limits, Stripe webhook verification, PostgreSQL backups, and monitoring.
+6. Create a Firebase project, register `research-os.org` and its local development URL as authorized domains, then enable Google and Email/Password under Authentication > Sign-in method. Put the four `NEXT_PUBLIC_FIREBASE_*` values in Cloudflare Pages and API environment variables.
+7. Create a Firebase Admin service account. Put its compact, one-line JSON in `FIREBASE_SERVICE_ACCOUNT_JSON` on the home API server only. Never add it to Cloudflare Pages.
+8. Apply migrations (`npm.cmd run db:migrate`) after deploying the API update; migration `004_firebase_ownership.sql` scopes existing records to the local development owner.
+9. Before launch, add API rate limits, Stripe webhook verification, PostgreSQL backups, and monitoring.
 
 Cloudflare Tunnel works well here because the home server makes outbound connections to Cloudflare; it does not need an inbound public port.

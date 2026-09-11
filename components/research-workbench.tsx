@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { GoogleAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, type User } from "firebase/auth";
 import type { Evidence, ResearchSession } from "@/lib/research/contracts";
 import type { Workspace, WorkspacePaper } from "@/lib/research/store";
+import { firebaseAuth, firebaseConfigured } from "@/lib/auth/firebase-client";
 
 const api = (path: string) => `${process.env.NEXT_PUBLIC_API_BASE_URL || ""}${path}`;
 
@@ -26,21 +28,36 @@ export function ResearchWorkbench() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
   const [paper, setPaper] = useState<WorkspacePaper | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [idToken, setIdToken] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
   const streamListRef = useRef<HTMLDivElement>(null);
   const followLiveRef = useRef(true);
   useEffect(() => {
     const list = streamListRef.current;
     if (list && followLiveRef.current) list.scrollTop = list.scrollHeight;
   }, [liveTrace.length]);
-  useEffect(() => { void fetch(api("/api/workspaces")).then((response) => response.ok ? response.json() : []).then(setWorkspaces).catch(() => setWorkspaces([])); }, []);
+  useEffect(() => {
+    if (!firebaseConfigured) { setAuthError("Firebase is not configured for this deployment."); return; }
+    return onAuthStateChanged(firebaseAuth(), async (nextUser) => { setUser(nextUser); setIdToken(nextUser ? await nextUser.getIdToken() : null); });
+  }, []);
+  useEffect(() => { if (!idToken) { setWorkspaces([]); return; } void fetch(api("/api/workspaces"), { headers: { Authorization: `Bearer ${idToken}` } }).then((response) => response.ok ? response.json() : []).then(setWorkspaces).catch(() => setWorkspaces([])); }, [idToken]);
+  const authenticatedHeaders = () => ({ "Content-Type": "application/json", ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) });
+  async function withAuth(action: () => Promise<void>) { setAuthError(null); setAuthLoading(true); try { await action(); } catch (cause) { setAuthError(cause instanceof Error ? cause.message : "Sign-in failed."); } finally { setAuthLoading(false); } }
+  async function signInGoogle() { await withAuth(() => signInWithPopup(firebaseAuth(), new GoogleAuthProvider()).then(() => undefined)); }
+  async function signInEmail(register = false) { await withAuth(() => (register ? createUserWithEmailAndPassword(firebaseAuth(), email, password) : signInWithEmailAndPassword(firebaseAuth(), email, password)).then(() => undefined)); }
   function updateFollowMode() {
     const list = streamListRef.current;
     if (list) followLiveRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < 12;
   }
   async function run() {
+    if (!idToken) { setError("Sign in before running research."); return; }
     setRunning(true); setSession(null); setSelectedEvidence([]); setError(null); setLiveTrace([]); followLiveRef.current = true;
     try {
-      const response = await fetch(api("/api/research/stream"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, workspaceId: workspaceId || undefined }) });
+      const response = await fetch(api("/api/research/stream"), { method: "POST", headers: authenticatedHeaders(), body: JSON.stringify({ question, workspaceId: workspaceId || undefined }) });
       if (!response.ok || !response.body) throw new Error("The research stream could not start.");
       const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
       while (true) {
@@ -60,20 +77,22 @@ export function ResearchWorkbench() {
   }
   async function createNewWorkspace() {
     const name = window.prompt("Workspace name"); if (!name?.trim()) return;
-    const response = await fetch(api("/api/workspaces"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    const response = await fetch(api("/api/workspaces"), { method: "POST", headers: authenticatedHeaders(), body: JSON.stringify({ name }) });
     if (!response.ok) { setError("Could not create the workspace."); return; }
     const workspace: Workspace = await response.json(); setWorkspaces((current) => [workspace, ...current]); setWorkspaceId(workspace.id);
   }
   async function draftPaper() {
     if (!workspaceId) { setError("Choose a workspace before drafting a paper."); return; }
-    const response = await fetch(api(`/api/workspaces/${workspaceId}/papers`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    const response = await fetch(api(`/api/workspaces/${workspaceId}/papers`), { method: "POST", headers: authenticatedHeaders(), body: JSON.stringify({}) });
     const body = await response.json(); if (!response.ok) { setError(body.error || "Could not draft a paper."); return; } setPaper(body);
   }
+  async function downloadPaper(format: "docx" | "pdf" | "markdown") { if (!paper || !idToken) return; const response = await fetch(api(`/api/papers/${paper.id}/export?format=${format}`), { headers: { Authorization: `Bearer ${idToken}` } }); if (!response.ok) { setError("Could not download the paper."); return; } const url = URL.createObjectURL(await response.blob()); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${paper.title}.${format === "markdown" ? "md" : format}`; anchor.click(); URL.revokeObjectURL(url); }
   return <div className="shell">
-    <header><div className="brand"><span className="mark">R</span><span>ResearchOS</span></div><span className="pill">MCP research runtime</span></header>
+    <header><div className="brand"><span className="mark">R</span><span>ResearchOS</span></div><span className="pill">MCP research runtime</span>{user && <button type="button" onClick={() => void signOut(firebaseAuth())}>Sign out</button>}</header>
+    {!user && <section className="auth-panel"><p className="eyebrow">Sign in to ResearchOS</p><button type="button" disabled={authLoading || !firebaseConfigured} onClick={() => void signInGoogle()}>Continue with Google</button><div><input aria-label="Email" type="email" value={email} placeholder="Email address" onChange={(event) => setEmail(event.target.value)} /><input aria-label="Password" type="password" value={password} placeholder="Password" onChange={(event) => setPassword(event.target.value)} /><button type="button" disabled={authLoading || !email || password.length < 6} onClick={() => void signInEmail(false)}>Sign in</button><button type="button" disabled={authLoading || !email || password.length < 6} onClick={() => void signInEmail(true)}>Create account</button></div>{authError && <p className="run-error" role="alert">{authError}</p>}</section>}
     <section className="hero"><p className="eyebrow">Evidence, not just answers</p><h1>Watch a research agent<br /><em>earn its conclusions.</em></h1><p className="lede">Plans, dynamically discovers MCP tools, evaluates sources, and preserves the path from each claim to its evidence.</p></section>
     <section className="workspace-picker"><label htmlFor="workspace">Research workspace</label><select id="workspace" value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)}><option value="">Unfiled session</option>{workspaces.map((workspace) => <option value={workspace.id} key={workspace.id}>{workspace.name}</option>)}</select><button type="button" onClick={createNewWorkspace}>New workspace</button></section>
-    <section className="question"><label htmlFor="question">Research question</label><textarea id="question" value={question} onChange={(e) => setQuestion(e.target.value)} /><button onClick={run} disabled={running}>{running ? "Running bounded research…" : "Run research →"}</button><small>Read-only tools run automatically. Mutating and paid tools stop for approval.</small></section>
+    <section className="question"><label htmlFor="question">Research question</label><textarea id="question" value={question} onChange={(e) => setQuestion(e.target.value)} /><button onClick={run} disabled={running || !user}>{running ? "Running bounded research…" : user ? "Run research →" : "Sign in to run research"}</button><small>Read-only tools run automatically. Mutating and paid tools stop for approval.</small></section>
     {error && <p className="run-error" role="alert">Research run failed: {error}</p>}
     {running && <div className="live-overlay" role="dialog" aria-modal="true" aria-labelledby="live-agent-title"><section className="live-run" aria-live="polite"><div className="section-title"><p className="eyebrow" id="live-agent-title">Live agent activity</p><span>{Math.min(92, 8 + liveTrace.length * 11)}%</span></div><div className="progress"><i style={{ width: `${Math.min(92, 8 + liveTrace.length * 11)}%` }} /></div><p className="stream-note">Showing the newest five events. Scroll up to inspect earlier activity.</p><div className="stream-list" ref={streamListRef} onScroll={updateFollowMode}>{liveTrace.length ? liveTrace.map((item) => <div className={`trace-item ${item.status}`} key={item.id}><i>{kindIcon[item.kind]}</i><strong>{item.message}</strong></div>) : <p className="waiting">Connecting to research runtime…</p>}</div></section></div>}
     {!session && !running && <section className="empty"><span>01 — Plan</span><span>02 — Gather</span><span>03 — Evaluate</span><span>04 — Synthesize</span></section>}
@@ -83,6 +102,6 @@ export function ResearchWorkbench() {
       <Provenance evidence={selectedEvidence.length ? selectedEvidence : session.evidence} />
     </section>}
     {session && <section className="paper-actions"><button onClick={draftPaper} disabled={!workspaceId}>Draft cited paper from workspace</button><small>{workspaceId ? "Combines evidence from all saved sessions in this workspace." : "Choose a workspace to enable paper drafting."}</small></section>}
-    {paper && <section className="paper-preview"><div><p className="eyebrow">Workspace paper</p><h2>{paper.title}</h2><div className="paper-downloads"><button onClick={() => navigator.clipboard.writeText(paper.contentMarkdown)}>Copy</button><a href={`/api/papers/${paper.id}/export?format=docx`}>Download DOCX</a><a href={`/api/papers/${paper.id}/export?format=pdf`}>Download PDF</a><a href={`/api/papers/${paper.id}/export?format=markdown`}>Markdown</a></div></div><pre>{paper.contentMarkdown}</pre></section>}
+    {paper && <section className="paper-preview"><div><p className="eyebrow">Workspace paper</p><h2>{paper.title}</h2><div className="paper-downloads"><button onClick={() => navigator.clipboard.writeText(paper.contentMarkdown)}>Copy</button><button onClick={() => void downloadPaper("docx")}>Download DOCX</button><button onClick={() => void downloadPaper("pdf")}>Download PDF</button><button onClick={() => void downloadPaper("markdown")}>Markdown</button></div></div><pre>{paper.contentMarkdown}</pre></section>}
   </div>;
 }
