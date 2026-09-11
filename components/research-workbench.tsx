@@ -1,0 +1,88 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { Evidence, ResearchSession } from "@/lib/research/contracts";
+import type { Workspace, WorkspacePaper } from "@/lib/research/store";
+
+const api = (path: string) => `${process.env.NEXT_PUBLIC_API_BASE_URL || ""}${path}`;
+
+const defaultQuestion = "Compare approaches for running coding agents against local LLMs with 12–16 GB VRAM.";
+const kindIcon: Record<string, string> = { plan: "◎", tool: "→", evaluation: "✓", approval: "◌", recovery: "!", synthesis: "✦" };
+
+function Provenance({ evidence }: { evidence: Evidence[] }) {
+  return <section className="provenance"><p className="eyebrow">Evidence chain</p>{evidence.length === 0 ? <p>No linked evidence.</p> : evidence.map((item) => <article className="source" key={item.id}>
+    <div><a href={item.sourceUrl} target="_blank" rel="noreferrer">{item.sourceTitle} ↗</a><p>“{item.excerpt}”</p></div>
+    <small>MCP server: {item.server}<br />Tool call: {item.toolCallId.slice(0, 8)}<br />Trace step: {item.traceStepId.slice(0, 8)}</small>
+  </article>)}</section>;
+}
+
+export function ResearchWorkbench() {
+  const [question, setQuestion] = useState(defaultQuestion);
+  const [session, setSession] = useState<ResearchSession | null>(null);
+  const [selectedEvidence, setSelectedEvidence] = useState<Evidence[]>([]);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [liveTrace, setLiveTrace] = useState<ResearchSession["trace"]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaceId, setWorkspaceId] = useState("");
+  const [paper, setPaper] = useState<WorkspacePaper | null>(null);
+  const streamListRef = useRef<HTMLDivElement>(null);
+  const followLiveRef = useRef(true);
+  useEffect(() => {
+    const list = streamListRef.current;
+    if (list && followLiveRef.current) list.scrollTop = list.scrollHeight;
+  }, [liveTrace.length]);
+  useEffect(() => { void fetch(api("/api/workspaces")).then((response) => response.ok ? response.json() : []).then(setWorkspaces).catch(() => setWorkspaces([])); }, []);
+  function updateFollowMode() {
+    const list = streamListRef.current;
+    if (list) followLiveRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < 12;
+  }
+  async function run() {
+    setRunning(true); setSession(null); setSelectedEvidence([]); setError(null); setLiveTrace([]); followLiveRef.current = true;
+    try {
+      const response = await fetch(api("/api/research/stream"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, workspaceId: workspaceId || undefined }) });
+      if (!response.ok || !response.body) throw new Error("The research stream could not start.");
+      const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read(); if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n"); buffer = frames.pop() ?? "";
+        for (const frame of frames) {
+          const event = frame.match(/^event: (.+)$/m)?.[1]; const data = frame.match(/^data: (.+)$/m)?.[1]; if (!event || !data) continue;
+          const payload = JSON.parse(data);
+          if (event === "trace") setLiveTrace((current) => [...current, payload]);
+          if (event === "complete") setSession(payload);
+          if (event === "error") throw new Error(payload.detail || "The research run failed.");
+        }
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The research run failed."); }
+    finally { setRunning(false); }
+  }
+  async function createNewWorkspace() {
+    const name = window.prompt("Workspace name"); if (!name?.trim()) return;
+    const response = await fetch(api("/api/workspaces"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    if (!response.ok) { setError("Could not create the workspace."); return; }
+    const workspace: Workspace = await response.json(); setWorkspaces((current) => [workspace, ...current]); setWorkspaceId(workspace.id);
+  }
+  async function draftPaper() {
+    if (!workspaceId) { setError("Choose a workspace before drafting a paper."); return; }
+    const response = await fetch(api(`/api/workspaces/${workspaceId}/papers`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    const body = await response.json(); if (!response.ok) { setError(body.error || "Could not draft a paper."); return; } setPaper(body);
+  }
+  return <div className="shell">
+    <header><div className="brand"><span className="mark">R</span><span>ResearchOS</span></div><span className="pill">MCP research runtime</span></header>
+    <section className="hero"><p className="eyebrow">Evidence, not just answers</p><h1>Watch a research agent<br /><em>earn its conclusions.</em></h1><p className="lede">Plans, dynamically discovers MCP tools, evaluates sources, and preserves the path from each claim to its evidence.</p></section>
+    <section className="workspace-picker"><label htmlFor="workspace">Research workspace</label><select id="workspace" value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)}><option value="">Unfiled session</option>{workspaces.map((workspace) => <option value={workspace.id} key={workspace.id}>{workspace.name}</option>)}</select><button type="button" onClick={createNewWorkspace}>New workspace</button></section>
+    <section className="question"><label htmlFor="question">Research question</label><textarea id="question" value={question} onChange={(e) => setQuestion(e.target.value)} /><button onClick={run} disabled={running}>{running ? "Running bounded research…" : "Run research →"}</button><small>Read-only tools run automatically. Mutating and paid tools stop for approval.</small></section>
+    {error && <p className="run-error" role="alert">Research run failed: {error}</p>}
+    {running && <div className="live-overlay" role="dialog" aria-modal="true" aria-labelledby="live-agent-title"><section className="live-run" aria-live="polite"><div className="section-title"><p className="eyebrow" id="live-agent-title">Live agent activity</p><span>{Math.min(92, 8 + liveTrace.length * 11)}%</span></div><div className="progress"><i style={{ width: `${Math.min(92, 8 + liveTrace.length * 11)}%` }} /></div><p className="stream-note">Showing the newest five events. Scroll up to inspect earlier activity.</p><div className="stream-list" ref={streamListRef} onScroll={updateFollowMode}>{liveTrace.length ? liveTrace.map((item) => <div className={`trace-item ${item.status}`} key={item.id}><i>{kindIcon[item.kind]}</i><strong>{item.message}</strong></div>) : <p className="waiting">Connecting to research runtime…</p>}</div></section></div>}
+    {!session && !running && <section className="empty"><span>01 — Plan</span><span>02 — Gather</span><span>03 — Evaluate</span><span>04 — Synthesize</span></section>}
+    {session && <section className="workspace">
+      <aside className="trace"><div className="section-title"><p className="eyebrow">Live execution trace</p><span className="complete">{session.status}</span></div>{session.trace.map((item) => <div className={`trace-item ${item.status}`} key={item.id}><i>{kindIcon[item.kind]}</i><div><strong>{item.message}</strong>{item.detail && <p>{item.detail}</p>}</div></div>)}<div className="budget">{session.budget.toolCallsUsed}/{session.budget.maxToolCalls} tool calls · {session.budget.iterationsUsed}/{session.budget.maxIterations} iterations · {session.budget.elapsedMs}ms</div></aside>
+      <article className="report"><p className="eyebrow">Research report</p><h2>{session.question}</h2><p className="summary">{session.report.summary}</p><div className="claims">{session.report.claims.map((claim) => { const linked = session.evidence.filter((item) => claim.evidenceIds.includes(item.id)); return <button className="claim" onClick={() => setSelectedEvidence(linked)} key={claim.id}><span className={`confidence ${claim.confidence}`}>{claim.confidence} confidence</span><span>{claim.text}</span><b>{linked.length} evidence {linked.length === 1 ? "link" : "links"} →</b></button>; })}</div><div className="limits"><strong>Research limitations</strong>{session.report.limitations.map((item) => <p key={item}>{item}</p>)}</div></article>
+      <Provenance evidence={selectedEvidence.length ? selectedEvidence : session.evidence} />
+    </section>}
+    {session && <section className="paper-actions"><button onClick={draftPaper} disabled={!workspaceId}>Draft cited paper from workspace</button><small>{workspaceId ? "Combines evidence from all saved sessions in this workspace." : "Choose a workspace to enable paper drafting."}</small></section>}
+    {paper && <section className="paper-preview"><div><p className="eyebrow">Workspace paper</p><h2>{paper.title}</h2><div className="paper-downloads"><button onClick={() => navigator.clipboard.writeText(paper.contentMarkdown)}>Copy</button><a href={`/api/papers/${paper.id}/export?format=docx`}>Download DOCX</a><a href={`/api/papers/${paper.id}/export?format=pdf`}>Download PDF</a><a href={`/api/papers/${paper.id}/export?format=markdown`}>Markdown</a></div></div><pre>{paper.contentMarkdown}</pre></section>}
+  </div>;
+}
