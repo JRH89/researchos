@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import { blogPost, blogPosts } from "@/lib/blog";
+
+const siteUrl = "https://research-os.org";
+export function generateStaticParams() { return blogPosts.map((post) => ({ slug: post.slug })); }
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> { const post = blogPost((await params).slug); if (!post) return {}; const url = `/blog/${post.slug}`; return { title: post.title, description: post.description, alternates: { canonical: url }, openGraph: { type: "article", url, title: post.title, description: post.description, publishedTime: post.publishedAt, modifiedTime: post.updatedAt, authors: ["ResearchOS"] } }; }
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) { const post = blogPost((await params).slug); if (!post) notFound(); const structuredData = { "@context": "https://schema.org", "@type": "BlogPosting", headline: post.title, description: post.description, datePublished: post.publishedAt, dateModified: post.updatedAt, mainEntityOfPage: `${siteUrl}/blog/${post.slug}`, author: { "@type": "Organization", name: "ResearchOS" }, publisher: { "@type": "Organization", name: "ResearchOS" } }; return <main className="site-page"><PublicSiteHeader /><article className="legal-page blog-post"><p className="eyebrow">ResearchOS journal</p><h1>{post.title}</h1><p className="post-date">Published {new Date(`${post.publishedAt}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>{post.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</article><PublicSiteFooter /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} /></main>; }

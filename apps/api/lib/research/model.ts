@@ -59,16 +59,17 @@ export async function synthesize(question: string, evidence: Evidence[]): Promis
   return { summary: "Research completed from the connected sources. Review each claim's evidence chain before acting on the result.", claims: evidence.slice(0, 3).map((item) => ({ text: item.excerpt, confidence: "medium" as const, evidenceIds: [item.id] })), limitations: ["No LLM adapter is configured, so this fallback preserves source excerpts instead of generating interpretive synthesis."] };
 }
 
-export async function writePaperBody(input: { title: string; paperType: "research-paper" | "essay"; citationStyle: "APA" | "MLA"; targetWordCount: number; researchQuestions?: string[]; evidence: Evidence[] }): Promise<string> {
+export async function writePaperBody(input: { title: string; paperType: "research-paper" | "essay"; citationStyle: "APA" | "MLA"; targetWordCount: number; researchQuestions?: string[]; evidence: Evidence[]; priorDraft?: string; revisionBrief?: string }): Promise<string> {
   const citation = (item: Evidence) => input.citationStyle === "APA" ? `(${item.authors?.[0]?.split(" ").at(-1) || `“${item.sourceTitle}”`}, ${item.publishedDate?.slice(0, 4) || "n.d."})` : `(${item.authors?.[0]?.split(" ").at(-1) || `“${item.sourceTitle}”`})`;
   const sources = input.evidence.map((item, index) => `[${index + 1}] Cite in text as ${citation(item)}\nTitle: ${item.sourceTitle}\nAuthor: ${item.authors?.join(", ") || "not supplied"}\nDate: ${item.publishedDate || "not supplied"}\nPublisher/site: ${item.publisher || item.siteName || "not supplied"}\nURL: ${item.sourceUrl}\nEvidence: ${item.excerpt}`).join("\n\n");
   const abstractRule = input.paperType === "research-paper" ? "Start with a concise `## Abstract` section, then write the body." : "Do not include an abstract.";
   const voiceRule = input.paperType === "essay" ? studentEssayVoice : formalResearchVoice;
+  const revisionRule = input.priorDraft ? `This is a revision of an existing student draft. Preserve its central thesis, successful organization, and supported reasoning where possible. Expand and improve it into one coherent paper instead of restarting from an unrelated outline. Incorporate the selected evidence and correct unsupported statements. ${input.revisionBrief ? `Revision request: ${input.revisionBrief}` : "Revision request: deepen the analysis and reach the new target length."}\n\nExisting draft:\n${input.priorDraft.slice(0, 24000)}\n\n` : "";
   const prompt = `Write the complete body of a ${input.citationStyle}-style ${input.paperType === "essay" ? "academic essay" : "research paper"} titled "${input.title}". ${abstractRule}
 
 Write approximately ${input.targetWordCount} words. ${voiceRule} ${noEmDashRule} This must read as connected academic prose: an introduction with a clear thesis, multiple developed body paragraphs that compare or explain the evidence, and a conclusion. Do not produce a list of claims, an outline, a Findings heading, or a Limitations section. Cite factual statements using the supplied style-specific in-text forms. Do not invent facts, source metadata, or citations. Do not include the title, student heading, References, or Works Cited; those are added separately. When multiple research runs are selected, address each of their questions rather than over-focusing on one.
 
-Selected research questions: ${input.researchQuestions?.join(" | ") || input.title}
+${revisionRule}Selected research questions: ${input.researchQuestions?.join(" | ") || input.title}
 
 Sources:\n${sources}`;
   const anthropic = claude();
