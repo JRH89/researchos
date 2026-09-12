@@ -14,8 +14,9 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const question = typeof body.question === "string" ? body.question : undefined;
   const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : undefined;
+  const depth = body.depth === "extended" ? "extended" : "standard";
   const billingReference = crypto.randomUUID();
-  const quote = quoteResearch(typeof body.webSearchAllowance === "number" ? body.webSearchAllowance : 5);
+  const quote = quoteResearch(depth === "extended" ? 8 : typeof body.webSearchAllowance === "number" ? body.webSearchAllowance : 5);
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
   void (async () => {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     try {
       await reserveCredits(auth.user.uid, quote.credits, { type: "research", id: billingReference });
       await writer.write(message("trace", { id: crypto.randomUUID(), at: new Date().toISOString(), kind: "plan", message: `Reserved ${quote.credits} credits for this research run.`, status: "complete" }));
-      const session = await runResearch(question, { onTrace: (trace) => { pendingWrites = pendingWrites.then(() => writer.write(message("trace", trace))); } });
+      const session = await runResearch(question, { depth, onTrace: (trace) => { pendingWrites = pendingWrites.then(() => writer.write(message("trace", trace))); } });
       const persisted = await saveSession(session, auth.user.uid, workspaceId);
       if (!persisted.persisted) session.trace.push({ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "recovery", message: "Session persistence unavailable.", detail: persisted.reason, status: "warning" });
       await pendingWrites;

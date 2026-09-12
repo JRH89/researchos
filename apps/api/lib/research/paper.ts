@@ -2,7 +2,7 @@ import { writePaperBody } from "./model";
 import { savePaper, workspaceSessions, type CitationStyle, type PaperMetadata, type WorkspacePaper } from "./store";
 import type { Evidence } from "./contracts";
 
-type PaperInput = { sessionIds?: unknown; title?: unknown; citationStyle?: unknown; targetWordCount?: unknown; sourceLimit?: unknown; paperType?: unknown; metadata?: unknown };
+type PaperInput = { sessionIds?: unknown; evidenceIds?: unknown; title?: unknown; citationStyle?: unknown; targetWordCount?: unknown; sourceLimit?: unknown; paperType?: unknown; metadata?: unknown };
 type Progress = (message: string, progress: number) => void;
 const reference = (item: Evidence, style: CitationStyle) => {
   const date = item.publishedDate || "n.d."; const author = item.authors?.join(", ");
@@ -14,7 +14,9 @@ export async function draftWorkspacePaper(workspaceId: string, ownerUid: string,
   const sessions = await workspaceSessions(workspaceId, ownerUid);
   const selectedIds = Array.isArray(input.sessionIds) ? new Set(input.sessionIds.filter((id): id is string => typeof id === "string")) : new Set(sessions.map((session) => session.id));
   const selected = sessions.filter((session) => selectedIds.has(session.id));
-  const uniqueEvidence = selected.flatMap((session) => session.evidence).filter((item, index, all) => all.findIndex((other) => other.sourceUrl === item.sourceUrl && other.excerpt === item.excerpt) === index);
+  const evidenceIds = Array.isArray(input.evidenceIds) ? input.evidenceIds.filter((id): id is string => typeof id === "string") : [];
+  const requestedEvidenceIds = evidenceIds.length ? new Set(evidenceIds) : undefined;
+  const uniqueEvidence = selected.flatMap((session) => session.evidence).filter((item) => !requestedEvidenceIds || requestedEvidenceIds.has(item.id)).filter((item, index, all) => all.findIndex((other) => other.sourceUrl === item.sourceUrl && other.excerpt === item.excerpt) === index);
   if (!uniqueEvidence.length) throw new Error("Select completed research sessions with evidence before drafting a paper.");
   const confidencePoints = { high: 3, medium: 2, low: 1 } as const;
   const evidenceScores = new Map<string, number>();
