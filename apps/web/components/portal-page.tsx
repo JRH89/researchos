@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GoogleAuthProvider, createUserWithEmailAndPassword, onIdTokenChanged, signInWithEmailAndPassword, signInWithPopup, signOut, type User } from "firebase/auth";
 import { firebaseAuth, firebaseConfigured } from "@/lib/auth/firebase-client";
-import { PublicSiteFooter, PublicSiteHeader } from "@/components/public-site-chrome";
+import { PublicSiteFooter, SiteHeader } from "@/components/public-site-chrome";
 
 type Mode = "account" | "support" | "admin";
 type Workspace = { id: string; name: string; description: string };
@@ -16,18 +16,6 @@ const api = (path: string) => {
   const local = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
   return `${local ? "http://localhost:3001" : process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001"}${path}`;
 };
-
-function PortalHeader({ onSignOut, signedIn }: { onSignOut: () => void; signedIn: boolean }) {
-  const [open, setOpen] = useState(false);
-  return <header className="portal-header dashboard-header">
-    <a className="brand" href="/"><span className="mark">R</span><span>ResearchOS</span></a>
-    <button className="mobile-menu dashboard-menu" type="button" aria-label="Toggle account navigation" aria-expanded={open} onClick={() => setOpen((current) => !current)}><i /><i /><i /></button>
-    <nav className={open ? "header-actions dashboard-actions open" : "header-actions dashboard-actions"} aria-label="Account navigation">
-      <a href="/">Research</a><a href="/account">Account</a><a href="/support">Support</a><a href="/?billing=1">Billing</a>
-      {signedIn ? <button type="button" onClick={onSignOut}>Sign out</button> : <a href="/?signin=1">Sign in</a>}
-    </nav>
-  </header>;
-}
 
 export function PortalPage({ mode }: { mode: Mode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -53,7 +41,7 @@ export function PortalPage({ mode }: { mode: Mode }) {
     setError("");
     try {
       if (mode === "account") { const [a, b, c, d] = await Promise.all([request("/api/workspaces"), request("/api/writing-profiles"), request("/api/billing/balance"), request("/api/account/library")]); if (![a, b, c, d].every((response) => response.ok)) throw new Error("Your session could not be loaded. Please sign in again."); setWorkspaces(await a.json()); setProfiles(await b.json()); setBalance(await c.json()); setLibrary(await d.json()); }
-      if (mode === "support") { const response = await request("/api/support/tickets"); if (!response.ok) throw new Error("Could not load your support tickets."); setTickets(await response.json()); }
+      if (mode === "support") { const [ticketsResponse, balanceResponse] = await Promise.all([request("/api/support/tickets"), request("/api/billing/balance")]); if (!ticketsResponse.ok || !balanceResponse.ok) throw new Error("Could not load your support tickets."); setTickets(await ticketsResponse.json()); setBalance(await balanceResponse.json()); }
       if (mode === "admin") { const [a, b] = await Promise.all([request("/api/admin/overview"), request("/api/admin/tickets")]); if (!a.ok || !b.ok) throw new Error("Administrator access is required."); setOverview(await a.json()); setTickets(await b.json()); }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load this page."); }
   }
@@ -68,7 +56,7 @@ export function PortalPage({ mode }: { mode: Mode }) {
   const title = mode === "account" ? "Your research library." : mode === "support" ? "Support when you need it." : "ResearchOS administration.";
   const usesPublicChrome = mode === "support" && !user;
   return <main className={`portal portal-${mode}`}>
-    {usesPublicChrome ? <PublicSiteHeader /> : <PortalHeader onSignOut={() => void leave()} signedIn={Boolean(user)} />}
+    <SiteHeader signedIn={Boolean(user)} credits={balance?.availableCredits} onBilling={() => window.location.assign("/?billing=1")} onSignOut={() => void leave()} />
     <section className="portal-intro"><p className="eyebrow">{mode === "admin" ? "Administrator" : mode === "support" ? "Help center" : "Account"}</p><h1>{title}</h1><p>{mode === "account" ? "Manage your workspaces, writing profiles, credits, and subscription in one place." : mode === "support" ? "Send a ticket, track its status, and find answers without leaving your research." : "Review platform activity and respond to support tickets."}</p></section>
     {!user && mode !== "support" ? <SignInCard email={signInEmail} password={password} onEmail={setSignInEmail} onPassword={setPassword} onGoogle={signIn} onEmailPassword={signInEmailPassword} error={error} /> : <>
       {error && <p className="run-error">{error}</p>}
