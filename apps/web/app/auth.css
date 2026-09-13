@@ -19,11 +19,11 @@
 .mobile-auth-actions { display: none; }
 
 .public-home { max-width: 1120px; margin: 0 auto; padding: 0 0 60px; }
-.public-hero { width: 100vw; min-height: calc(100vh - 74px); margin-left: calc(50% - 50vw); padding: 96px clamp(120px, 10vw, 200px); background: linear-gradient(rgb(255 255 255 / .72), rgb(255 255 255 / .72)), url("/images/landing/social-preview.png") center / cover no-repeat; text-align: left; }
+.public-hero { width: 100vw; min-height: calc(100vh - 74px); margin-left: calc(50% - 50vw); padding: 82px max(40px, calc((100vw - 1460px) / 2 + 40px)); background: linear-gradient(rgb(255 255 255 / .72), rgb(255 255 255 / .72)), url("/images/landing/social-preview.png") center / cover no-repeat; text-align: left; }
 @media (min-width: 1400px) { .public-hero { background: url("/images/landing/social-preview.png") center / cover no-repeat; } }
-.public-hero h1 { margin: 0; color: #20323d; font: 600 clamp(50px, 7vw, 86px)/.98 Inter, Arial, sans-serif; letter-spacing: -.07em; }
+.public-hero h1 { max-width: 630px; margin: 0; color: #20323d; font: 600 clamp(48px, 6vw, 88px)/.96 Inter, Arial, sans-serif; letter-spacing: -.07em; }
 .public-hero h1 em { color: #58717d; font-style: normal; font-weight: 400; }
-.public-hero > p:not(.eyebrow) { max-width: 540px; margin: 26px 0 0; color: #526873; font: 400 19px/1.6 Inter, Arial, sans-serif; }
+.public-hero > p:not(.eyebrow) { max-width: 570px; margin: 26px 0 0; color: #526873; font: 400 19px/1.55 Inter, Arial, sans-serif; }
 .public-cta { display: grid; justify-items: start; gap: 15px; margin-top: 34px; }
 .public-cta button { border: 0; border-radius: 5px; padding: 14px 20px; background: #2d4652; color: #fff; font: 600 14px Inter, Arial, sans-serif; cursor: pointer; }
 .public-cta span { color: #72828a; font: 500 11px 'IBM Plex Mono', monospace; }
