@@ -13,4 +13,12 @@ describe("research engine", () => {
     expect(result.budget.toolCallsUsed).toBeLessThanOrEqual(result.budget.maxToolCalls);
     expect(streamed).toEqual(result.trace.map((trace) => trace.id));
   });
+
+  it("honors a requested source target within bounded execution limits", async () => {
+    process.env.RESEARCHOS_DEMO_MODE = "true";
+    const result = await runResearch("test question", { sourceTarget: 7 });
+    expect(result.trace[0]?.message).toContain("7 distinct validated sources");
+    expect(result.budget.maxToolCalls).toBeGreaterThanOrEqual(7);
+    expect(result.budget.maxToolCalls).toBeLessThanOrEqual(12);
+  });
 });
