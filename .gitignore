@@ -7,3 +7,4 @@ apps/**/out
 !.env.example
 *-firebase-adminsdk-*.json
 firebase-service-account*.json
+.notes/
