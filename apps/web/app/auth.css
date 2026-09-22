@@ -116,9 +116,9 @@
 .public-faq summary::after { content: "+"; color: #597b87; font: 400 27px/.7 Inter, Arial, sans-serif; }
 .public-faq details[open] summary::after { content: "−"; }
 .public-faq details p { margin: 0; padding: 0 22px 20px; border-top: 1px solid #e1e8eb; font-size: 14px; }
-.public-footer { display: flex; justify-content: space-between; align-items: center; max-width: 1120px; margin: 0 auto; padding: 28px 0 0; border-top: 1px solid #d5dfe3; color: #71818a; font: 500 11px 'IBM Plex Mono', monospace; }
+.public-footer { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 1120px; margin: 0 auto; padding: 28px 0 0; border-top: 1px solid #d5dfe3; color: #71818a; font: 500 11px 'IBM Plex Mono', monospace; box-sizing: border-box; }
 .public-footer .brand { color: #263b46; text-decoration: none; }
-.public-footer nav { display: flex; align-items: center; gap: 16px; }
+.public-footer nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; }
 .public-footer button { border: 0; background: transparent; color: #526a75; font: 600 12px Inter, Arial, sans-serif; cursor: pointer; }
 html { scroll-behavior: smooth; }
 body { overflow-x: clip; }
@@ -426,7 +426,9 @@ body { overflow-x: clip; }
   .public-pricing-grid article { min-height: 0; }
   .public-about { margin-bottom: 70px; padding: 34px 20px; }
   .public-split h2, .public-about h2, .public-faq h2, .public-pricing h2 { font-size: 31px; }
-  .public-footer { align-items: flex-start; flex-direction: column; gap: 18px; }
+  .public-footer { align-items: flex-start; flex-direction: column; gap: 18px; padding-top: 24px; }
+  .public-footer nav { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
+  .public-footer nav a { min-height: 40px; display: flex; align-items: center; }
   .demo-page { padding: 0 18px 46px; }
   .demo-intro { align-items: flex-start; flex-direction: column; margin: 48px auto 30px; }
   .demo-intro h1 { font-size: clamp(42px, 13vw, 62px); }
