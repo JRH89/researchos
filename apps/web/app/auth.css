@@ -7,6 +7,7 @@
 .app-header { position: fixed; inset: 0 0 auto; z-index: 40; display: block; padding: 0; border: 0; background: rgb(247 249 250 / .72); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 1px 0 rgb(155 174 183 / .32); }
 .app-header-inner { position: relative; display: flex; align-items: center; gap: 22px; max-width: 1460px; min-height: 74px; margin: 0 auto; padding: 12px 40px; }
 .app-header .brand { flex: 0 0 auto; color: #263b46; text-decoration: none; }
+.brand-icon { display: block; width: 32px; height: 32px; object-fit: contain; flex: 0 0 auto; }
 .app-header .public-nav { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 1.6vw, 23px); flex: 1; }
 .app-header .public-nav.signed-nav { display: none; }
 .app-header .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }

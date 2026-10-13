@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://research-os.org"),
   title: { default: "ResearchOS | Evidence-backed research", template: "%s | ResearchOS" },
   description: "Plan research, inspect evidence provenance, and write cited papers from selected research runs.",
+  icons: { icon: "/favicon-512.png", apple: "/favicon-512.png" },
   keywords: ["research agent", "MCP", "source provenance", "cited papers", "academic research"],
   alternates: { canonical: "/" },
   openGraph: { type: "website", url: "/", siteName: "ResearchOS", title: "ResearchOS | Evidence-backed research", description: "Plan, inspect, and write from traceable source evidence.", images: [{ url: "/images/landing/social-preview.png", width: 1200, height: 630, alt: "ResearchOS evidence-backed research" }] },
